@@ -35,7 +35,7 @@ The project follows a straightforward CI/CD workflow:
 
 ## Step 1: Infrastructure Setup on AWS EC2
 
-We need three separate servers for this setup.
+[cite_start]We need three separate servers for this setup[cite: 25].
 
 1.  **Launch EC2 Instances:**
     -   **Jenkins Server:**
@@ -48,7 +48,10 @@ We need three separate servers for this setup.
         -   AMI: `Ubuntu Server`
         -   Instance Type: `t2.medium or higher`.
 
-2.  **Configure Security Groups:**
+2.  **Assign Elastic IPs (EIP):**
+    -   After launching, assign an Elastic IP to each of the three instances. [cite_start]This ensures that their public IP addresses are static and will not change after a reboot[cite: 26, 27]. This is critical for stable communication between Jenkins, SonarQube, and the Docker host.
+
+3.  **Configure Security Groups:**
     -   **For Jenkins Instance:**
         -   `SSH` (Port `22`) from your IP.
         -   `HTTP` (Port `8080`) from anywhere (`0.0.0.0/0`) to access the Jenkins dashboard.
@@ -57,11 +60,11 @@ We need three separate servers for this setup.
         -   `HTTP` (Port `9000`) from anywhere (`0.0.0.0/0`) to access the SonarQube dashboard.
     -   **For Docker Host Instance:**
         -   `SSH` (Port `22`) from your IP and from the Jenkins instance's IP.
-        -   `HTTP` (Port `80`) from anywhere (`0.0.0.0/0`) to access the deployed application.
+        -   `HTTP` (Port `8085`) from anywhere (`0.0.0.0/0`) to access the deployed application.
 
 ## Step 2: Jenkins Server Setup
 
-1.  SSH into your Jenkins instance.
+1.  [cite_start]SSH into your Jenkins instance[cite: 28].
 
 2.  **Install Java (Required for Jenkins):**
     ```bash
@@ -81,7 +84,7 @@ We need three separate servers for this setup.
     ```
 
 4.  **Initial Jenkins Setup:**
-    -   Access Jenkins at `http://<YOUR_JENKINS_IP>:8080`.
+    -   [cite_start]Access the Jenkins GUI dashboard via its public IP at `http://<YOUR_JENKINS_PUBLIC_IP>:8080`[cite: 29].
     -   Get the initial admin password:
         ```bash
         sudo cat /var/lib/jenkins/secrets/initialAdminPassword
@@ -90,31 +93,40 @@ We need three separate servers for this setup.
 
 5.  **Install Additional Plugins:**
     -   Go to **Manage Jenkins > Plugins > Available plugins**.
-    -   Install `SonarQube Scanner` and **`Publish Over SSH`**. The **Publish Over SSH** plugin is crucial as it allows Jenkins to transfer files and execute commands on a remote Docker host via SSH.
+    -   Install `SonarQube Scanner` and **`Publish Over SSH`**. [cite_start]The **Publish Over SSH** plugin is crucial as it allows Jenkins to transfer files and execute commands on a remote Docker host via SSH[cite: 44, 45].
 
 ## Step 3: SonarQube Server Setup
 
-1.  SSH into your SonarQube instance.
+1.  [cite_start]SSH into your SonarQube instance[cite: 31].
 
-2.  **Increase Virtual Memory for Elasticsearch:**
+2.  **Install Java and Unzip Utility:**
     ```bash
-    sudo sysctl -w vm.max_map_count=262144
+    sudo apt update
+    sudo apt install -y openjdk-11-jre unzip
     ```
 
-3.  **Install SonarQube using Docker (Recommended):**
+3.  **Download and Set Up SonarQube:**
     ```bash
-    sudo apt-get update
-    sudo apt-get install -y docker.io
-    sudo systemctl start docker
-    sudo systemctl enable docker
-    sudo docker run -d --name sonarqube -p 9000:9000 -p 9092:9092 sonarqube:lts-community
+    # Download the SonarQube distribution files
+    wget [https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-9.9.0.65446.zip](https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-9.9.0.65446.zip)
+
+    # Unzip the downloaded file
+    unzip sonarqube-9.9.0.65446.zip
+
+    # Navigate to the correct directory for your system (Linux 64-bit)
+    cd sonarqube-9.9.0.65446/bin/linux-x86-64/
+
+    # Start the SonarQube server
+    ./sonar.sh console
     ```
 
-4.  Access SonarQube at `http://<YOUR_SONARQUBE_IP>:9000`. Log in with default credentials: `admin` / `admin`. You will be prompted to change the password.
+4.  **Access SonarQube GUI:**
+    -   [cite_start]Once the server is running, you can access the SonarQube GUI dashboard via its public IP at `http://<YOUR_SONARQUBE_PUBLIC_IP>:9000`[cite: 32].
+    -   Log in with default credentials: `admin` / `admin`. You will be prompted to change the password.
 
 ## Step 4: Docker Host (Deployment Server) Setup
 
-1.  SSH into your Docker Host instance.
+1.  [cite_start]SSH into your Docker Host instance[cite: 35].
 
 2.  **Install Docker:**
     ```bash
@@ -131,7 +143,7 @@ We need three separate servers for this setup.
 
 ## Step 5: System Configuration
 
-### A. Connect Jenkins to SonarQube
+### [cite_start]A. Connect Jenkins to SonarQube [cite: 34]
 
 1.  **In SonarQube:**
     -   Go to **Administration > Security > Users**. Click the token icon for the `admin` user to generate a new token. Name it `jenkins-token` and copy it.
@@ -149,11 +161,10 @@ We need three separate servers for this setup.
         -   **Name**: `Docker-Host` (this name will be used in the Jenkinsfile).
         -   **Hostname**: `<YOUR_DOCKER_HOST_IP>`.
         -   **Username**: `ubuntu` (or your remote username).
-        -   Click **Advanced...** and check **Use password authentication, or use a different key**.
-        -   Provide your authentication method (e.g., password or path to the private key).
+        -   Click **Advanced...** and provide your authentication method (e.g., password or path to the private key).
     -   Click **Test Configuration** to ensure Jenkins can connect to the Docker host.
 
-### C. Configure GitHub Webhook
+### [cite_start]C. Configure GitHub Webhook [cite: 30]
 
 1.  **In your GitHub Repository:**
     -   Go to **Settings > Webhooks**.
@@ -204,7 +215,6 @@ In your GitHub repository, create the following files.
 
             stage('Code Analysis') {
                 steps {
-                    // This stage is a placeholder. A real project would require a sonar-project.properties file.
                     script {
                         echo "Skipping SonarQube analysis for this example."
                     }
@@ -214,27 +224,19 @@ In your GitHub repository, create the following files.
             stage('Build & Deploy') {
                 steps {
                     echo "Starting deployment using Publish Over SSH plugin..."
-                    // This stage transfers files and executes build/run commands on the remote Docker host.
                     sshPublisher(
                         publishers: [
                             sshPublisherDesc(
                                 configName: DOCKER_HOST_CONFIG,
                                 transfers: [
                                     sshTransfer(
-                                        sourceFiles: '**', // Transfer all files from the workspace
-                                        remoteDirectory: '/home/ubuntu/app', // A directory on the Docker host
+                                        sourceFiles: '**', 
+                                        remoteDirectory: '/home/ubuntu/app', 
                                         execCommand: '''
-                                            echo "Changing to remote directory..."
                                             cd /home/ubuntu/app
-
-                                            echo "Building Docker image..."
                                             docker build -t ${DOCKER_IMAGE_NAME} .
-
-                                            echo "Stopping and removing old container if it exists..."
                                             docker stop ${DOCKER_IMAGE_NAME} || true
                                             docker rm ${DOCKER_IMAGE_NAME} || true
-
-                                            echo "Running new Docker container..."
                                             docker run -d --name ${DOCKER_IMAGE_NAME} -p 80:80 ${DOCKER_IMAGE_NAME}
                                         '''
                                     )
@@ -271,9 +273,9 @@ In your GitHub repository, create the following files.
 1.  Commit and push all files to your GitHub repository.
     ```bash
     git add .
-    git commit -m "Initial project setup with Publish Over SSH"
+    git commit -m "Final project setup"
     git push origin main
     ```
 2.  The `push` will trigger the Jenkins pipeline.
 3.  Monitor the pipeline's progress in the Jenkins dashboard.
-4.  Once completed, navigate to `http://<YOUR_DOCKER_HOST_IP>`. You should see your web page live.
+4.  Once completed, navigate to `http://<YOUR_DOCKER_HOST_IP>`. You should see your web page live[cite: 40, 41].
