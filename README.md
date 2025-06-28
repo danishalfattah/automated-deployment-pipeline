@@ -21,8 +21,6 @@ The project follows a straightforward CI/CD workflow:
 
 `Code Push` -> `GitHub Webhook` -> `Jenkins Job Trigger` -> `SonarQube Analysis` -> `File Transfer & Remote Execution` -> `Docker Build & Deploy`
 
-![Architecture Diagram](https://user-images.githubusercontent.com/8951939/188879532-62342502-3165-455a-94b2-603350257cbc.png)
-*(Feel free to replace this with your own diagram)*
 
 ## Prerequisites
 
