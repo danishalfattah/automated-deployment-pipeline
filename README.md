@@ -54,64 +54,47 @@ The project follows a straightforward CI/CD workflow:
 ## Step 3: SonarQube Server Setup
 
 1.  SSH into your SonarQube instance.
-
-2.  **Install Prerequisites:**
-    ```bash
-    sudo apt update
-    sudo apt install -y openjdk-11-jre unzip
-    ```
-
-3.  **Download and Unzip SonarQube:**
-    -   Go to the [SonarQube downloads page](https://www.sonarsource.com/products/sonarqube/downloads/) and get the link for the latest LTS (Long-Term Support) version.
+2.  Install Java and the `unzip` utility.
+3.  Download and set up SonarQube. It's recommended to get the latest LTS (Long-Term Support) version from the [SonarQube downloads page](https://www.sonarsource.com/products/sonarqube/downloads/).
     ```bash
     # Replace the link with the one you copied
     wget [https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-9.9.4.87374.zip](https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-9.9.4.87374.zip)
-
-    # Replace the filename if you downloaded a different version
     unzip sonarqube-9.9.4.87374.zip
     sudo mv sonarqube-9.9.4.87374 /opt/sonarqube
     ```
-
-4.  **Create a dedicated user for SonarQube:**
+4.  Create a dedicated user and set permissions for SonarQube:
     ```bash
     sudo adduser --system --no-create-home --group --disabled-login sonarqube
     sudo chown -R sonarqube:sonarqube /opt/sonarqube
     ```
+5.  Create a systemd service file (`sudo nano /etc/systemd/system/sonar.service`) to run SonarQube in the background:
+    ```ini
+    [Unit]
+    Description=SonarQube service
+    After=syslog.target network.target
 
-5.  **Create a systemd Service File to run SonarQube:**
-    -   Create a new service file: `sudo nano /etc/systemd/system/sonar.service`
-    -   Paste the following content into the file:
-        ```ini
-        [Unit]
-        Description=SonarQube service
-        After=syslog.target network.target
+    [Service]
+    Type=forking
+    User=sonarqube
+    Group=sonarqube
+    PermissionsStartOnly=true
+    ExecStart=/opt/sonarqube/bin/linux-x86-64/sonar.sh start
+    ExecStop=/opt/sonarqube/bin/linux-x86-64/sonar.sh stop
+    StandardOutput=syslog
+    LimitNOFILE=65536
+    LimitNPROC=4096
+    TimeoutStartSec=5
+    Restart=always
 
-        [Service]
-        Type=forking
-        User=sonarqube
-        Group=sonarqube
-        PermissionsStartOnly=true
-        ExecStart=/opt/sonarqube/bin/linux-x86-64/sonar.sh start
-        ExecStop=/opt/sonarqube/bin/linux-x86-64/sonar.sh stop
-        StandardOutput=syslog
-        LimitNOFILE=65536
-        LimitNPROC=4096
-        TimeoutStartSec=5
-        Restart=always
-
-        [Install]
-        WantedBy=multi-user.target
-        ```
-    -   Save and exit the editor (`Ctrl+X`, `Y`, `Enter`).
-
-6.  **Start and Enable the SonarQube Service:**
+    [Install]
+    WantedBy=multi-user.target
+    ```
+6.  Start and enable the SonarQube service:
     ```bash
     sudo systemctl start sonar
     sudo systemctl enable sonar
-    sudo systemctl status sonar
     ```
-
-7.  **Access SonarQube GUI:** Access the SonarQube GUI via its public IP at `http://<YOUR_SONARQUBE_PUBLIC_IP>:9000`.
+7.  Access the SonarQube GUI via its public IP at `http://<YOUR_SONARQUBE_PUBLIC_IP>:9000`.
 
 ## Step 4: Docker Host Setup
 
@@ -145,12 +128,34 @@ The project follows a straightforward CI/CD workflow:
 
 ## Step 6: Creating the Project Files
 
-In your GitHub repository, you only need your application files. For this project, you need:
+At a minimum, your GitHub repository should contain an `index.html` and a `Dockerfile`. Here are the example contents for each file.
 
 1.  **`index.html`**
-2.  **`Dockerfile`**
+    ```html
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>CI/CD Project</title>
+    </head>
+    <body>
+        <h1>CI/CD Pipeline Successful!</h1>
+        <p>This page was automatically deployed by a Jenkins pipeline.</p>
+    </body>
+    </html>
+    ```
 
-You **do not** need a `Jenkinsfile`.
+2.  **`Dockerfile`**
+    ```dockerfile
+    # Use a lightweight Nginx image as the base
+    FROM nginx:alpine
+
+    # Copy all files from the current directory into the container
+    COPY . /usr/share/nginx/html
+
+    # Expose port 80 (the default Nginx port) inside the container
+    EXPOSE 80
+    ```
 
 ## Step 7: Creating and Configuring the Jenkins Job
 
@@ -196,4 +201,4 @@ You **do not** need a `Jenkinsfile`.
     ```
 3.  The push will trigger the Jenkins job automatically.
 4.  Monitor the build progress in the Jenkins dashboard.
-5.  Once it succeeds, open your browser and navigate to `http://<YOUR_DOCKER_HOST_IP>:8085`. You should see your updated web page.
+5.  Once it succeeds, open your browser and navigate to `http://<YOUR_DOCKER_HOST_IP>:8085`. You should see your updated web page live.
